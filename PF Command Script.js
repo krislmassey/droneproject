@@ -1,11 +1,10 @@
 var arDrone = require('ar-drone');
 var client = arDrone.createClient();
-var Project;
-var serialport = require('node-serialport')
+var serialport = require('node-serialport');
 var sp = new serialport.SerialPort("/dev/ttyO3", {
   parser: serialport.parsers.readline("\n"),
   baud: 9600
-})
+});
 
 //Enable navdata
 client.config('general:navdata_demo', 'FALSE');
@@ -22,8 +21,8 @@ var TOP = 0;
 var BOTTOM = 0;
 
 //DRONE OPERATION TIME
-CYCLE = 0   //don't change this
-TOTAL_OPERATION_CYCLES = 10000  //how many times the drone should operate.  Edit as needed.
+CYCLE = 0;   //don't change this
+TOTAL_OPERATION_CYCLES = 10000;  //how many times the drone should operate.  Edit as needed.
 
 
 //sleep code from http://stackoverflow.com/questions/951021/what-is-the-javascript-version-of-sleep
@@ -74,10 +73,10 @@ function get_obstacle_force(distance, angle){
 
     //flip angle since force should go opposite obstacle direction
     if(angle >= 0) {
-        d = wrap_angle(angle + 180) //direction
+        d = wrap_angle(angle + 180); //direction
     }
     else{
-        d = wrap_angle(angle - 180) //direction
+        d = wrap_angle(angle - 180); //direction
     }
 
     var force_from_obstacle = m * Math.cos(d);
@@ -96,8 +95,8 @@ function goal_force(){  //TODO
 function obstacle_force(){
 
     front_force = 0 - get_obstacle_force(FRONT, YAW);
-    right_force = 0 - get_obstacle_force(RIGHT, -ROLL);
     left_force = 0 - get_obstacle_force(LEFT, ROLL);
+    right_force = 0 - get_obstacle_force(RIGHT, -ROLL);
     top_force = 0 - get_obstacle_force(TOP, PITCH);
     bottom_force = 0 - get_obstacle_force(BOTTOM, -PITCH);
 
@@ -117,9 +116,9 @@ function drive_from_force(total_force){
     var drive_multiplier = 0.3; //must be value between 0 and 1 (% of force used)
 
     //get components
-    var x = total_force[0]  // + go forward, - go backward
-    var y = total_force[1]  // + go left, - go right
-    var z = total_force[2]  //+ go up, - go down
+    var x = total_force[0];  // + go forward, - go backward
+    var y = total_force[1];  // + go left, - go right
+    var z = total_force[2];  //+ go up, - go down
 
     //valid speeds are from 0-1.  Must convert total force to value between 0 and 1
     //but ALSO MUST KEEP THEM PROPORTIONAL
@@ -202,17 +201,18 @@ function potential(){
             //TODO: PARSE Project INTO INDIVIDUAL VALUES
             var sensor_array = Project.split(" ");
             update_arduino_sensors(sensor_array);
-        })
+        });
 
         sp.on('navdata', function(navdata) {
             //TODO: need to see what raw nav data looks like
             update_drone_sensors(navdata);
-        })
+        });
 
         //CALCULATE FORCES
         var g_force = goal_force();
         var o_force = obstacle_force();
         var total_force = add_forces(g_force, o_force);
+        //TODO:  Add random uniform fields up and down to handle vertical obstacles
         drive_from_force(total_force);
 
         //sleep this function for a SHORT time while drone flies
@@ -232,13 +232,13 @@ function potential(){
 function main(){
     client.after(1000, function() {  //start
     this.takeoff();
-    })
+    });
 
     potential();  //navigate autonomously
 
     client.after(1000, function() {  //finish
         this.land();
-    })
+    });
 }
 
 
