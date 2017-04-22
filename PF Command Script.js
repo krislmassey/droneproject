@@ -12,9 +12,9 @@ client.config('general:navdata_demo', 'FALSE');
 
 //DRONE NAVIGATION VARIABLES NEEDED
 var ROBOT = new Array(0, 0, 0);  //drone starts at x/y/z origin point
-//var PITCH = 0;
-//var ROLL = 0;
-//var YAW = 0;
+var PITCH = 0;
+var ROLL = 0;
+var YAW = 0;
 var FRONT = 0;
 var LEFT = 0;
 var RIGHT = 0;
@@ -38,6 +38,12 @@ function update_arduino_sensors(sensor_array){
     TOP = sensor_array[3];
 }
 
+function update_drone_sensors(navdata) {
+    BOTTOM = navdata.demo.altitudeMeters;
+    PITCH = navdata.demo.frontBackDegrees;
+    ROLL = navdata.demo.leftRightDegrees;
+    YAW = navdata.demo.clockwiseDegrees;
+}
 function add_forces(a, b){
     //This function adds to force vectors together and returns the result
     if (a.length != b.length){
@@ -155,7 +161,7 @@ function drive_from_force(total_force){
 
 function get_pf_magnitude_linear(distance){
     //How close to the obstacle do we have to be to begin feeling repulsive force
-    var distance_threshold = 1.0;
+    var distance_threshold = 1.0;  //in meters?
 
     //The maximum strength of the repulsive force
     var max_strength = 20.0;
@@ -189,7 +195,7 @@ function potential(){
 
     while(GoalNotMet){
         //GET SENSOR UPDATES TO GLOBALS
-        sp.on('data', function(chunk) {  // do all within this event listener then INTERRUPT
+        sp.on('data', function(chunk) {
             var Project = chunk.toString();
             console.log("%s", Project);
 
@@ -199,13 +205,11 @@ function potential(){
         })
 
         sp.on('navdata', function(navdata) {
-            //need to see what raw nav data looks like
-            //also possibly important: demo navdata
-            BOTTOM = navdata.demo.altitudeMeters
-
+            //TODO: need to see what raw nav data looks like
+            update_drone_sensors(navdata);
         })
 
-
+        //CALCULATE FORCES
         var g_force = goal_force();
         var o_force = obstacle_force();
         var total_force = add_forces(g_force, o_force);
