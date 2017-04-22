@@ -7,11 +7,14 @@ var sp = new serialport.SerialPort("/dev/ttyO3", {
   baud: 9600
 })
 
+//Enable navdata
+client.config('general:navdata_demo', 'FALSE');
+
 //DRONE NAVIGATION VARIABLES NEEDED
 var ROBOT = new Array(0, 0, 0);  //drone starts at x/y/z origin point
-var PITCH = 0;
-var ROLL = 0;
-var YAW = 0;
+//var PITCH = 0;
+//var ROLL = 0;
+//var YAW = 0;
 var FRONT = 0;
 var LEFT = 0;
 var RIGHT = 0;
@@ -26,6 +29,13 @@ TOTAL_OPERATION_CYCLES = 10000  //how many times the drone should operate.  Edit
 //sleep code from http://stackoverflow.com/questions/951021/what-is-the-javascript-version-of-sleep
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function update_arduino_sensors(sensor_array){
+    FRONT = sensor_array[0];
+    LEFT = sensor_array[1];
+    RIGHT = sensor_array[2];
+    TOP = sensor_array[3];
 }
 
 function add_forces(a, b){
@@ -53,6 +63,8 @@ function wrap_angle(angle){
 function get_obstacle_force(distance, angle, axis){
     var force_from_obstacles = new Array(0, 0, 0);
 
+    //u = cos(alpha)*i + cos(beta)*j + cos(gamma)*k
+
     var m = get_pf_magnitude_linear(distance);  //need to adjust for angle?
 
     //flip angle since force should go opposite obstacle direction
@@ -66,17 +78,17 @@ function get_obstacle_force(distance, angle, axis){
     //axis tells whether the force should affect the x, y, or z axis
     if(axis === "x"){
         new_x = force_from_obstacles[0] + (m * Math.cos(d));
-        new_y = force_from_obstacles[1] + (m * Math.sin(d));
-        new_z = force_from_obstacles[2] + (m * Math.tan(d));
+        new_y = 0;
+        new_z = 0;
     }
     if(axis === "y"){
-        new_x = force_from_obstacles[0] + (m * Math.tan(d));
+        new_x = 0;
         new_y = force_from_obstacles[1] + (m * Math.cos(d));
-        new_z = force_from_obstacles[2] + (m * Math.sin(d));
+        new_z = 0;
     }
     if(axis === "z"){
-        new_x = force_from_obstacles[0] + (m * Math.sin(d));
-        new_y = force_from_obstacles[1] + (m * Math.tan(d));
+        new_x = 0;
+        new_y = 0;
         new_z = force_from_obstacles[2] + (m * Math.cos(d));
     }
 
@@ -90,6 +102,7 @@ function get_obstacle_force(distance, angle, axis){
 function goal_force(){  //TODO
 
     //return uniform force, no goal point right now
+    //to make drone move forward, give it a positive x value
     var strength = 0.25;  //magnitude of uniform force
     return new Array(0, 0, 0);
 }
@@ -125,8 +138,50 @@ function obstacle_force(){
     return total_force;
 }
 
-function drive_from_force(total_force){ //TODO
+function drive_from_force(total_force){
+    var drive_multiplier = 0.3; //must be value between 0 and 1 (% of force used)
 
+    //get components
+    var x = total_force[0]  // + go forward, - go backward
+    var y = total_force[1]  // + go left, - go right
+    var z = total_force[2]  //+ go up, - go down
+
+    //valid speeds are from 0-1.  Must convert total force to value between 0 and 1
+    //but ALSO MUST KEEP THEM PROPORTIONAL
+    var combined_forces = Math.abs(x) + Math.abs(y) + Math.abs(z);
+    var alpha = 1/combined_forces;
+
+
+    var x_speed = Math.abs(x) * alpha * drive_multiplier;
+    var y_speed = Math.abs(y) * alpha * drive_multiplier;
+    var z_speed = Math.abs(z) * alpha * drive_multiplier;
+
+    //handle X Component (Front/Back)
+    if (x == 0){}  //do nothing
+    else if( x > 0){
+        client.forward(x_speed);
+    }
+    else {
+        client.back(x_speed);
+    }
+
+    //handle Y Component (Left/Right)
+    if (y == 0){}  //do nothing
+    else if( y > 0){
+        client.left(y_speed);
+    }
+    else {
+        client.right(y_speed);
+    }
+
+    //handle Z Component (Up/Down)
+    if (z == 0){}  //do nothing
+    else if( z > 0){
+        client.up(z_speed);
+    }
+    else {
+        client.down(z_speed);
+    }
 }
 
 function get_pf_magnitude_linear(distance){
@@ -157,37 +212,51 @@ function update_goal_status(){
     }
 }
 
-function potential(){  //TODO:  NEED TO DRIVE AND HAVE VARIABLE UPDATES
+
+function potential(){
 
     var GoalNotMet = 1;
     var rate = 5;  //set sleep rate time in ms
 
     while(GoalNotMet){
-        //TODO:  UPDATE NAVIGATION VARIABLES
+        //GET SENSOR UPDATES TO GLOBALS
+        sp.on('data', function(chunk) {  // do all within this event listener then INTERRUPT
+            var Project = chunk.toString();
+            console.log("%s", Project);
+
+            //TODO: PARSE Project INTO INDIVIDUAL VALUES
+            var sensor_array = Project.split(" ");
+            update_arduino_sensors(sensor_array);
+        })
+
+        sp.on('navdata', function(navdata) {
+            //need to see what raw nav data looks like
+            //also possibly important: demo navdata
+            BOTTOM = navdata.demo.altitudeMeters
+
+        })
+
 
         var g_force = goal_force();
         var o_force = obstacle_force();
         var total_force = add_forces(g_force, o_force);
-        //TODO:  Must figure out how to add together multiple driving directions
-        //var twist = drive_from_force(total_force);
+        drive_from_force(total_force);
 
-        //TODO:  publish "twist" command - must figure out JS equivalent
-
-        //sleep this function for a short time.
+        //sleep this function for a short time while drone flies
         await sleep(rate);
 
         //make sure drone not flying while new directions are found
-        //var twist = Twist();
-        //publish(twist);
+        client.stop();
 
         //Check if goal met
         GoalNotMet = update_goal_status();
 
         //then repeat
+
     }
 }
 
-function main(){ //TODO
+function main(){
     client.after(1000, function() {  //start
     this.takeoff();
     })
@@ -198,39 +267,5 @@ function main(){ //TODO
         this.land();
     })
 }
-
-
-
-
-
-//need to figure out how to incorporate this to get data how we would like
-sp.on('data', function(chunk) {
-  Project = chunk.toString();
-  console.log("%s",Project);
-  if(Project== 'T'){
-   client.stop();
-   client.land();
-   client.animateLeds('blinkRed', 5 ,2);
- console.log("Drone Landed\n");
-  }
-  if(Project == 'F'){
-  client.front(0.08);
-  }
-  if(Project== 'L'){
-  client.left(0.06);
-  }
-  if(Project== 'R'){
-  client.right(0.06);
-  }
-  if(Project== 'Q'){
-  client.left(0.06);
-  }
-  if(Project== 'P'){
-  client.right(0.06);
-  }
-  if(Project== 'S'){
-  client.stop();
-  }
-});
 
 
