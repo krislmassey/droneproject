@@ -44,17 +44,19 @@ void setup() {
   pinMode(TOP_ECHO, INPUT);
   pinMode(LEFT_TRIG, OUTPUT);
   pinMode(LEFT_ECHO, INPUT);
+  Serial.println("Set up..");
 }
 
 void loop() {
   long* distances;
 
-  distances = getRawDistances();
+  //saSerial.println("Getting distances..");
+  //distances = getRawDistances();
   //distances = getAverageDistances(10);
-  //distances = getFilteredDistances(10);
+  distances = getFilteredDistances(10);
 
   sendDistances(distances);
-  Serial.println();
+  //Serial.println();
   delay(1000);
 }
 
@@ -80,13 +82,16 @@ long getDistanceRaw(int dir) {
 // direction and distance seperated by one space
 // Example: "F 20;R 27;T 32;L 17;"
 void sendDistances(long distances[]) {
+  //Serial.println("Constructing distance string..");
   String data = "";
   for (int dir = 0; dir < 4; dir++) {
     if (dir == FRONT) data = data += "F ";
     else if (dir == RIGHT) data += "R ";
     else if (dir == TOP) data += "T ";
     else if (dir == LEFT) data += "L ";
-    data += distances[dir] + ";";
+    //Serial.println("Adding distance for dir");
+    data += distances[dir];
+    data += ';';
   }
   Serial.println(data);
 }
@@ -122,11 +127,12 @@ long* getFilteredDistances(int num_samples) {
   long average;
   long distance;
   long std_dev;
+  int keep;
 
   // for each direction
   for (int dir = 0; dir < 4; dir++) {
     average = 0;
-    std_dev = 0;
+    //Serial.println("Getting averages for dir ");
     // get num_samples of raw distance and average them
     // keep up with each raw reading for later filtering
     for (int s_num = 0; s_num <= num_samples; s_num++) {
@@ -138,27 +144,30 @@ long* getFilteredDistances(int num_samples) {
         average = ((average * (s_num - 1)) + distance) / s_num;
       }
     }
-    
+
+    std_dev = 0;
+    //Serial.println("Getting standard deviation for dir ");
     // get the standard deviation
     for (int s_num = 0; s_num < num_samples; s_num++) {
       std_dev += (readings[s_num] - average)*(readings[s_num] - average);
     }
     std_dev = sqrt(std_dev / (num_samples - 1));
 
+    keep = 0;
     // get rid of readings outside of standard deviation from average
-    int keep = 0;
     for (int s_num = 0; s_num < num_samples; s_num++) {
       if (readings[s_num] > (average + std_dev) |
           readings[s_num] < (average - std_dev)) {
           continue;
       }
       // average the good readings
-      if (keep = 0) {
+      if (keep == 0) {
         distances[dir] = readings[s_num];
         keep++;
       }
       else {
         distances[dir] = ((distances[dir] * (keep - 1)) + readings[s_num]) / keep;
+        keep++;
       }
     }
   }
