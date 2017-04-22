@@ -60,43 +60,23 @@ function wrap_angle(angle){
     return angle;
 }
 
-function get_obstacle_force(distance, angle, axis){
-    var force_from_obstacles = new Array(0, 0, 0);
+function get_obstacle_force(distance, angle){
 
     //u = cos(alpha)*i + cos(beta)*j + cos(gamma)*k
 
     var m = get_pf_magnitude_linear(distance);  //need to adjust for angle?
 
     //flip angle since force should go opposite obstacle direction
-    if(cur_angle >= 0) {
+    if(angle >= 0) {
         d = wrap_angle(angle + 180) //direction
     }
     else{
         d = wrap_angle(angle - 180) //direction
     }
 
-    //axis tells whether the force should affect the x, y, or z axis
-    if(axis === "x"){
-        new_x = force_from_obstacles[0] + (m * Math.cos(d));
-        new_y = 0;
-        new_z = 0;
-    }
-    if(axis === "y"){
-        new_x = 0;
-        new_y = force_from_obstacles[1] + (m * Math.cos(d));
-        new_z = 0;
-    }
-    if(axis === "z"){
-        new_x = 0;
-        new_y = 0;
-        new_z = force_from_obstacles[2] + (m * Math.cos(d));
-    }
+    var force_from_obstacle = m * Math.cos(d);
 
-    force_from_obstacles[0] = new_x;
-    force_from_obstacles[1] = new_y;
-    force_from_obstacles[2] = new_z;
-
-    return force_from_obstacles;
+    return force_from_obstacle;
 }
 
 function goal_force(){  //TODO
@@ -109,31 +89,20 @@ function goal_force(){  //TODO
 
 function obstacle_force(){
 
-    front_force = 0 - get_obstacle_force(FRONT, YAW, "y");
-    right_force = 0 - get_obstacle_force(RIGHT, ROLL, "x");
-    left_force = 0 - get_obstacle_force(LEFT, -ROLL, "x");
-    top_force = 0 - get_obstacle_force(TOP, PITCH, "z");
-    bottom_force = 0 - get_obstacle_force(BOTTOM, -PITCH, "z");
+    front_force = 0 - get_obstacle_force(FRONT, YAW);
+    right_force = 0 - get_obstacle_force(RIGHT, -ROLL);
+    left_force = 0 - get_obstacle_force(LEFT, ROLL);
+    top_force = 0 - get_obstacle_force(TOP, PITCH);
+    bottom_force = 0 - get_obstacle_force(BOTTOM, -PITCH);
 
     //add forces
     total_force = new Array(0, 0, 0);
-    total_force[0] = front_force[0] +   //x components
-            right_force[0] +
-            left_force[0] +
-            top_force[0] +
-            bottom_force[0];
 
-    total_force[1] = front_force[1] +  //y components
-            right_force[1] +
-            left_force[1] +
-            top_force[1] +
-            bottom_force[1];
+    total_force[0] = front_force;               //x components
 
-    total_force[2] = front_force[2] +  //z components
-            right_force[2] +
-            left_force[2] +
-            top_force[2] +
-            bottom_force[2];
+    total_force[1] =  right_force + left_force; //y components
+
+    total_force[2] = top_force + bottom_force;  //z components
 
     return total_force;
 }
@@ -242,7 +211,7 @@ function potential(){
         var total_force = add_forces(g_force, o_force);
         drive_from_force(total_force);
 
-        //sleep this function for a short time while drone flies
+        //sleep this function for a SHORT time while drone flies
         await sleep(rate);
 
         //make sure drone not flying while new directions are found
