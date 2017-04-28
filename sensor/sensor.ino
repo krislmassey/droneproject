@@ -50,14 +50,12 @@ void setup() {
 void loop() {
   long* distances;
 
-  //saSerial.println("Getting distances..");
-  //distances = getRawDistances();
+  distances = getRawDistances();
   //distances = getAverageDistances(10);
-  distances = getFilteredDistances(10);
-
+  //distances = getFilteredDistances(10);
+  
   sendDistances(distances);
-  //Serial.println();
-  delay(1000);
+  //delay(1000);
 }
 
 // get raw distance from dir sensor
@@ -74,14 +72,15 @@ long getDistanceRaw(int dir) {
   duration = pulseIn(echo_pin, HIGH);
   
   distance = (duration/2) / 29.1;
-  
+  if (distance > 200) return 200;
+  if (distance < 20) return 20;
   return distance;
 }
 
 // serial print the direction and distances delimited by semicolons
 // direction and distance seperated by one space
 // Example: "F 20;R 27;T 32;L 17;"
-void sendDistances(long distances[]) {
+void sendDistancesSlow(long distances[]) {
   //Serial.println("Constructing distance string..");
   String data = "";
   for (int dir = 0; dir < 4; dir++) {
@@ -92,6 +91,21 @@ void sendDistances(long distances[]) {
     //Serial.println("Adding distance for dir");
     data += distances[dir];
     data += ';';
+  }
+  Serial.println(data);
+}
+
+void sendDistances(long distances[]) {
+  String data = "";
+  for (int dir = 0; dir < 4; dir++) {
+    data += distances[dir];
+    data += ' ';
+//    if (dir == FRONT) Serial.print("F ");
+//    else if (dir == RIGHT) Serial.print("R ");
+//    else if (dir == TOP) Serial.print("T ");
+//    else if (dir == LEFT) Serial.print("L ");
+//    Serial.print(distances[dir]);
+//    Serial.print(';');
   }
   Serial.println(data);
 }
